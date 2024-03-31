@@ -69,7 +69,7 @@ int main () {
 	{
 		if (pthread_join(thread[tid], NULL))
 		{
-			printf("Error joining thread %ld\n", tid);
+            printf("Error joining thread %d: \n", tid);
 		}
 	}
 	

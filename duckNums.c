@@ -12,95 +12,14 @@ const unsigned long MIN_THREADS = 1;
 const unsigned long MAX_THREADS = 30;
 const unsigned long MIN_LIMIT = 100;
 const unsigned long BLOCK = 5000;
+
 unsigned long currCheck = 1;
 unsigned long userLimit = 0;
 unsigned long duckNumberCount = 0;
 unsigned long threadCount = 0;
 
-void getParams(int argc, char *argv[]);
+pthread_mutex_t globalVariable_mutex;
 
-int duckCntThread(unsigned long n, int BLOCK);
-
-int main(int argc, char *argv[]) 
-{
-
-    getParams(argc, argv);
-
-    printf("CS 370 - Project #2\nDuck Numbers Program\n\n");
-
-    printf("Hardware Cores: 6\n");
-    printf("Thread count:   %d\n", atoi(argv[2]));
-    printf("Numbers Limit:  %d\n", atoi(argv[4]));
-
-    printf("\nPlease wait. Running...\n\n");
-
-    unsigned long ourLimit = atoi(argv[4]);
-
-
-
-
-	pthread_t thread[atoi(argv[2])];
-	pthread_attr_t thread_attr;
-	pthread_attr_init(&thread_attr);
-	
-	int tid= 0;
-	
-    while (currCheck < ourLimit)
-    {
-
-	for (; tid < atoi(argv[2]); tid++) 
-	{
-		if (pthread_create(&thread[tid], &thread_attr, duckCntThread(currCheck, BLOCK), NULL))
-		{
-			printf("Error creating thread %d \n", tid);
-			exit (-1);
-		}
-	}
-
-	for (tid = 0; tid < atoi(argv[2]); tid++)
-	{
-		if (pthread_join(thread[tid], NULL))
-		{
-			printf("Error joining thread %d\n", tid);
-		}
-	}
-
-
-    }   
-
-
-
-	
-	for (tid = 0; tid < atoi(argv[2]); tid++)
-	{
-		if (pthread_join(thread[tid], NULL))
-		{
-			printf("Error joining thread %d\n", tid);
-		}
-	}
-
-}
-
-
-
-
-
-
-
-
-
-    while (currCheck < ourLimit)
-    {
-        duckNumberCount += duckCntThread(currCheck, BLOCK);
-        currCheck += BLOCK;
-
-    }
-    
-    printf("Count of Duck numbers from 1 to %ld is %ld\n", ourLimit, duckNumberCount);
-
-    return 0;
-
-}
 
 void getParams(int argc, char *argv[]){
 
@@ -159,15 +78,38 @@ void getParams(int argc, char *argv[]){
 
 }
 
-int duckCntThread(unsigned long n, int BLOCK){
+void *duckCntThread(void *args){
+
+
+    while (currCheck < userLimit)
+    {
+
 
     int numOfZeros = 0;
-    int limitStop = n + BLOCK - 1;
-    int numDuck = 0;
-    int i = limitStop;
+    int currTmp = currCheck;
+    int limitStop = 0;
+    int i = currCheck + BLOCK - 1;
 
-for (i; i != n ; i--)
+    long *tid_addr = (long*)args;
+	long tid = *tid_addr;
+
+    pthread_mutex_lock(&globalVariable_mutex);
+    currCheck += BLOCK;
+    pthread_mutex_unlock(&globalVariable_mutex);
+
+    // printf("Currcheck: %ld\n", currCheck);
+    // printf("CurrTmp: %d\n", currTmp);
+    // printf("limitStop: %d\n", limitStop);
+
+
+
+
+// NOTE: check for numbers under 5k
+
+for (i; i != currTmp-1 ; i--)
 {
+
+
 
     limitStop = i;
 
@@ -178,24 +120,82 @@ for (i; i != n ; i--)
             numOfZeros++;
         }
         limitStop /= 10;
-        //printf("n: %ld", n);
     }
 
-  //  printf("%d\n", limitStop);
 
     if (numOfZeros == 1)
     {
-        numDuck++;
+	    
+        pthread_mutex_lock(&globalVariable_mutex);
+        duckNumberCount++;
+	    pthread_mutex_unlock(&globalVariable_mutex);
+
     }
     
 
 }
 
-
-
-
-
-   // printf("numOfZeros: %d", numOfZeros);
-    return numDuck; 
+}
+pthread_exit(args);
 
 }
+
+int main(int argc, char *argv[]) 
+{
+
+
+
+    getParams(argc, argv);
+
+    printf("CS 370 - Project #2\nDuck Numbers Program\n\n");
+    long numCores = sysconf(_SC_NPROCESSORS_ONLN);
+
+    printf("Hardware Cores: %ld\n", numCores);
+    printf("Thread count:   %d\n", atoi(argv[2]));
+    printf("Numbers Limit:  %d\n", atoi(argv[4]));
+    printf("\nPlease wait. Running...\n\n");
+
+    userLimit = atoi(argv[4]);
+    int ourThreads = atoi(argv[2]);
+
+	pthread_t thread[ourThreads];
+	pthread_attr_t thread_attr;
+
+
+	long tid = 0;
+	
+	pthread_attr_init(&thread_attr);
+
+
+	for (tid; tid < ourThreads; tid++) 
+	{
+ 
+		if (pthread_create(&thread[tid], &thread_attr, duckCntThread, &tid))
+		{
+			printf("Error creating thread %ld \n", tid);
+			exit (-1);
+		}
+	}
+
+
+	for (tid = 0; tid < ourThreads; tid++)
+	{
+		if (pthread_join(thread[tid], NULL))
+		{
+			printf("Error joining thread %ld\n", tid);
+            exit (-1);
+
+		}
+	}
+
+
+
+   printf("\nDuck Number Results\nCount of Duck numbers from 1 to %ld is %ld\n", userLimit, duckNumberCount);  
+
+return 0;
+}
+
+
+
+
+
